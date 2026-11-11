@@ -37,6 +37,14 @@ function saveArchive(a: Record<string, Session>) {
 }
 export function loadArchived(id: string): Session | null { return loadArchive()[id] ?? null; }
 
+/** The most recent real session on this device (archived, or the last one saved), for "Your stats" on the landing page.
+ *  The results page merges it with the earlier ones, so this shows the same view as just finishing a game. */
+export function latestSession(history: HistoryEntry[], last: Session | null): Session | null {
+  return [last, ...history.map((h) => loadArchived(h.session_id))]
+    .filter((s): s is Session => !!s?.meta && !s.meta.simulated && s.trials.length > 0)
+    .sort((a, b) => b.meta.start_time.localeCompare(a.meta.start_time))[0] ?? null;
+}
+
 export function loadHistory(): HistoryEntry[] {
   try { return JSON.parse(localStorage.getItem(KEY) ?? '[]') as HistoryEntry[]; } catch { return []; }
 }

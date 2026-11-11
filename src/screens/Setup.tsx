@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { loadLocal } from '../lib/export';
 import { LevelToggle, useLevel } from '../lib/level';
-import { clearAllAttempts, type HistoryEntry, loadArchived, removeFromHistory } from '../lib/history';
+import { clearAllAttempts, type HistoryEntry, latestSession, loadArchived, removeFromHistory } from '../lib/history';
 import { type Config, type Dataset, type Session } from '../lib/types';
 
 const pct = (v: number | null) => (v == null ? '–' : `${Math.round(v * 100)}%`);
@@ -14,6 +14,7 @@ export function Setup({ data, initial, history, debug, onStart, onSimulate, onOp
   const [level, setLevel] = useLevel();
   const [keysText, setKeysText] = useState(initial.keys.join(''));
   const [last] = useState(() => loadLocal());
+  const mine = latestSession(history, last);
   const keys = keysText.toUpperCase().replace(/\s+/g, '').split('');
   const cfg: Config = { ...c, keys: [keys[0] ?? 'F', keys[1] ?? 'J'] };
   const valid = keys.length === 2 && keys[0] !== keys[1];
@@ -27,7 +28,7 @@ export function Setup({ data, initial, history, debug, onStart, onSimulate, onOp
         <p className="subtitle">{level === 'learner'
           ? 'You will see two proteins, touching. Do they really bind, or has someone scrambled the amino acids of the joint? Look around and decide, then see whether the AI did better.'
           : `Two-chain complexes from the PDB released after Boltz-2's training cutoff, against decoys with ${Math.round(data.mut_fraction * 100)}% of interface positions randomised using static replacement. Scored against Boltz-2, ProteinMPNN and sequence-only baselines.`}</p>
-        <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center', margin: '2px 0 22px' }}><button className="btn btn-primary" disabled={!valid || left === 0} onClick={() => onStart(cfg)} style={{ padding: '12px 34px', fontSize: 16 }}>Start</button><a className="btn" href="https://substack.com/@mattpenner/note/p-224368016?r=4nmn57&utm_source=notes-share-action&utm_medium=web" target="_blank" rel="noreferrer" style={{ padding: '12px 22px', fontSize: 16, color: 'var(--text)', textDecoration: 'none' }}>Read the blog</a></div>
+        <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center', margin: '2px 0 22px' }}><button className="btn btn-primary" disabled={!valid || left === 0} onClick={() => onStart(cfg)} style={{ padding: '12px 34px', fontSize: 16 }}>Start</button><button className="btn" disabled={!mine} title={mine ? 'Your results so far, as at the end of a game' : 'Play a game first to see your stats'} onClick={() => mine && onOpenSession(mine)} style={{ padding: '12px 22px', fontSize: 16 }}>Your stats</button><a className="btn" href="https://substack.com/@mattpenner/note/p-224368016?r=4nmn57&utm_source=notes-share-action&utm_medium=web" target="_blank" rel="noreferrer" style={{ padding: '12px 22px', fontSize: 16, color: 'var(--text)', textDecoration: 'none' }}>Read the blog</a></div>
 
         <div className="card" style={{ marginBottom: 18 }}>
           <h3 className="card-title">What is this?</h3>
