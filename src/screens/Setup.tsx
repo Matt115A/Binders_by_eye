@@ -27,7 +27,7 @@ export function Setup({ data, initial, history, debug, onStart, onSimulate, onOp
         <p className="subtitle">{level === 'learner'
           ? 'You will see two proteins, touching. Do they really bind, or has someone scrambled the amino acids of the joint? Look around and decide, then see whether the AI did better.'
           : `Two-chain complexes from the PDB released after Boltz-2's training cutoff, against decoys with ${Math.round(data.mut_fraction * 100)}% of interface positions randomised using static replacement. Scored against Boltz-2, ProteinMPNN and sequence-only baselines.`}</p>
-        <button className="btn btn-primary" disabled={!valid || left === 0} onClick={() => onStart(cfg)} style={{ padding: '12px 34px', fontSize: 16, margin: '2px 0 22px' }}>Start</button>
+        <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center', margin: '2px 0 22px' }}><button className="btn btn-primary" disabled={!valid || left === 0} onClick={() => onStart(cfg)} style={{ padding: '12px 34px', fontSize: 16 }}>Start</button><a className="btn" href="https://substack.com/@mattpenner/note/p-224368016?r=4nmn57&utm_source=notes-share-action&utm_medium=web" target="_blank" rel="noreferrer" style={{ padding: '12px 22px', fontSize: 16, color: 'var(--text)', textDecoration: 'none' }}>Read the blog</a></div>
 
         <div className="card" style={{ marginBottom: 18 }}>
           <h3 className="card-title">What is this?</h3>
