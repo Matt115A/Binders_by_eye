@@ -52,11 +52,22 @@ of the construction, not of binding.
 
 **The second limitation.** Replacing half an interface with uniformly random residues leaves a sequence no protein
 family would produce, and that is detectable without any reasoning about binding. ESM2-650M, given one chain's
-sequence at a time with no structure and no partner, calls it right 95% of the time; ProteinMPNN given the backbone
-reaches 99%. So the ceiling here measures sequence naturalness far more than interface quality. A harder version
-would draw replacements from a profile of the chain's own family, or from residues of similar type and burial, so
-that each chain stays a plausible protein and only the fit across the join is wrong. Treat the current numbers as a
-floor on model performance, not as evidence about binding prediction.
+sequence at a time with no structure and no partner, calls it right 95% of the time; ProteinMPNN's raw log p given
+the backbone (`mpnn_complex`) reaches 99%. Neither is judging the interface, so **neither is shipped as a
+benchmark**: a model the player is scored against should be answering the question the player was asked. Both are
+still computed, and the numbers stay here, because they are the measurement of the artefact.
+
+The line between the two was drawn on evidence rather than intuition. Across all items every score correlates with
+every other, because they all track the label; the test that separates them is the correlation *within* one class.
+Among fakes, `mpnn_complex` still follows ESM2 (r = +0.38) — it is partly reading sequence plausibility — while
+`mpnn_delta` is uncorrelated with it (r = −0.05 among fakes, −0.04 among reals). The delta cancels the naturalness
+term it shares with `mpnn_single` and keeps only what the partner chain adds, so it survives as a benchmark at
+94.2%.
+
+So the ceiling here still measures sequence naturalness far more than interface quality. A harder version would draw
+replacements from a profile of the chain's own family, or from residues of similar type and burial, so that each
+chain stays a plausible protein and only the fit across the join is wrong. Treat the current numbers as a floor on
+model performance, not as evidence about binding prediction.
 
 ## What the browser is given
 
@@ -76,8 +87,14 @@ feature model.
 ## Benchmarks
 
 - **Boltz-2** (Passaro et al. 2025; MIT) — `pipeline/modal_boltz2.py`, run on Modal with an A100. Each item's two
-  sequences only, MSAs from the ColabFold MSA server, 3 recycling steps, 1 diffusion sample. Score: **ipTM**.
-  Interface pLDDT is kept as a second variant.
+  sequences only, MSAs from the ColabFold MSA server, 3 recycling steps, 1 diffusion sample. **One prediction per
+  item, read two ways**, which is why two Boltz-2 rows appear and why the second costs nothing:
+  - **`Boltz-2 ipTM`** — `iptm`, its confidence in the *relative placement* of the two chains.
+  - **`Boltz-2 ipLDDT`** — `complex_iplddt`, mean per-atom confidence *at the interface*.
+
+  They are not near-duplicates: their calls agree on only 70% of items (κ = +0.40, raw score r = +0.41), and
+  ipLDDT is the more accurate of the two (75.0% against 65.4%). The metric is written into the model's label
+  because it is the only thing distinguishing them on screen.
 - **AlphaFold2-multimer v3** (Evans et al. 2021) via **ColabFold** (Mirdita et al. 2022; MIT) —
   `pipeline/modal_af2.py`, same Modal setup, `--model-type alphafold2_multimer_v3`, 3 recycles, 1 model.
   Score: **ipTM**. **Not in dataset 1.0.0**: on Modal, ColabFold stalled while loading the weights, before predicting,
@@ -86,9 +103,8 @@ feature model.
   Mean log p of the residue actually present at the interface positions, decoded last given everything else:
   once with the whole two-chain backbone (`mpnn_complex`), once with only that residue's own chain
   (`mpnn_single`), and their difference (`mpnn_delta`), which is the interface-complementarity term.
-- **ESM2 650M** (Lin et al. 2023; MIT) — `pipeline/esm_scores.py`. Masked-marginal log probability at the interface
-  positions, each chain scored on its own, with no partner and no structure. The control that separates "this
-  sequence looks odd" from "this interface looks wrong".
+  **Only `mpnn_delta` is a benchmark.** The other two are sequence-plausibility measures, not interface
+  judgements, and are excluded for the reason below; they are still computed and quoted as diagnostics.
 - **Feature model** — gradient-boosted trees (scikit-learn) on the ten descriptors, scored with
   **leave-one-complex-out** cross-validation, so it never trains on the complex it is judging.
 - **Single-cue rules** — fewest clashes, most hydrogen bonds, largest buried area.
@@ -122,3 +138,20 @@ modal run         pipeline/modal_af2.py           # -> data/work/af2.json   (opt
 runs finish. Build FASPR with
 `xcrun clang++ -std=c++11 -isysroot "$(xcrun --show-sdk-path)" -O3 -ffast-math -o FASPR src/*.cpp` on macOS, or
 `g++ -O3 -ffast-math -o FASPR src/*.cpp` on Linux, and keep `dun2010bbdep.bin` beside the binary.
+
+## Contributions are cumulative
+
+Each game remembers every session it plays in this browser (`bioai.sessions`) and offers them as **one datapoint per
+game and dataset version**, appended in the order they were played. Contributing after playing again therefore
+*replaces* the row already in the database rather than adding a second one, so one player stays one person in the
+analysis however many sessions they play. Sessions saved before this existed are picked up from each game's own
+archive the first time a results page is opened.
+
+The database grants only insert and `withdraw(token)`, so an update is "insert the merged row, then withdraw the
+token it supersedes" — in that order, so an interruption leaves the data present (briefly as two rows) rather than
+missing. A row left behind that way is retried on the next results page, and the hub treats a datapoint that is a
+prefix of another as the same person and keeps the longer, so a failed withdrawal cannot inflate the contributor
+count. Withdrawing removes the whole cumulative datapoint.
+
+The results page's analysis covers **every session on the device** by default, with a toggle for the run just
+finished; Replay, Data and the CSV/JSON exports always stay with the single session.

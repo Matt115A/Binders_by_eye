@@ -160,3 +160,9 @@ export function modelProfile(s: Session, byId: Map<number, Item>, models: { name
     };
   }).sort((a, b) => b.kappa - a.kappa);
 }
+
+/** A model's label for display. Strips a parenthetical aside that only restates the model's kind, and keeps
+ *  everything else — in particular the metric, which is the only thing telling 'Boltz-2 ipTM' and 'Boltz-2
+ *  ipLDDT' apart (one prediction, two confidence readouts). Lived in three copies until they had to agree. */
+export const shortModel = (l: string) =>
+  l.replace(/ \((sees what you see|interface fit|sequence given backbone|sequence only)\)/, '');

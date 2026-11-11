@@ -1,3 +1,5 @@
+import { loadLocal } from './export';
+import { backfillSessions, buildContribution, forgetSessions } from './bioai';
 import type { Session } from './types';
 
 /**
@@ -69,6 +71,7 @@ export function addToHistory(s: Session): HistoryEntry[] {
 }
 
 export function removeFromHistory(id: string): HistoryEntry[] {
+  forgetSessions({ ids: [id] });
   const h = loadHistory().filter((e) => e.session_id !== id);
   save(h);
   const a = loadArchive(); delete a[id]; saveArchive(a);
@@ -78,6 +81,7 @@ export function removeFromHistory(id: string): HistoryEntry[] {
 
 /** Forget every attempt on this device: history, saved sessions, and the last-session copy. Preferences are kept. */
 export function clearAllAttempts(): HistoryEntry[] {
+  forgetSessions({ games: ['binders'] });
   for (const k of [KEY, ARCHIVE, LAST]) { try { localStorage.removeItem(k); } catch { /* storage unavailable */ } }
   return [];
 }
@@ -85,4 +89,35 @@ export function clearAllAttempts(): HistoryEntry[] {
 /** History entries that started before this session (what the player had already done). */
 export function priorTo(h: HistoryEntry[], s: Session): HistoryEntry[] {
   return h.filter((e) => e.session_id !== s.meta.session_id && e.start_time < s.meta.start_time);
+}
+
+/** This session as a BioAI by eye datapoint (may be short: the results card pools short sessions). */
+export function sessionContribution(s: Session) {
+  return buildContribution('binders', String(s.meta.app_version ?? ''), String(s.meta.dataset_version ?? ''), ['learn', 'new'],
+    s.trials.map((t) => ({ item: t.item_id, response: String(t.response), phase: t.phase, rt: t.rt_ms })));
+}
+
+/** Let sessions saved before cumulative contributions existed count too: only ones still in history (not deleted), never simulated. */
+export function backfillPastSessions() {
+  const kept = new Set(loadHistory().map((e) => e.session_id));
+  const seen = new Set<string>();
+  backfillSessions([...Object.values(loadArchive()), loadLocal()].filter((s): s is Session => !!s?.meta && !s.meta.simulated && kept.has(s.meta.session_id))
+    .filter((s) => !seen.has(s.meta.session_id) && !!seen.add(s.meta.session_id))
+    .map((s) => ({ id: s.meta.session_id, startedAt: Date.parse(s.meta.start_time), c: sessionContribution(s) })));
+}
+
+/** Every real session on this device for the same dataset — this one included — merged in the order they were
+ *  played, so the results page can analyse everything the player has done rather than one run. Trials keep their own
+ *  phase, so phase and learning statistics simply span more of them; `sessions` is how many went in. */
+export function cumulativeSession(s: Session): { session: Session; sessions: number } {
+  const all = [s, ...Object.values(loadArchive())]
+    .filter((x): x is Session => !!x?.meta && !x.meta.simulated && x.meta.dataset_version === s.meta.dataset_version)
+    .filter((x, i, a) => a.findIndex((y) => y.meta.session_id === x.meta.session_id) === i)   // the live copy of s wins
+    .sort((a, b) => a.meta.start_time.localeCompare(b.meta.start_time));
+  if (all.length < 2) return { session: s, sessions: 1 };
+  const active = all.reduce((t, x) => t + (x.meta.active_duration_ms ?? 0), 0);
+  return {
+    session: { ...s, meta: { ...s.meta, start_time: all[0].meta.start_time, active_duration_ms: active }, trials: all.flatMap((x) => x.trials) },
+    sessions: all.length,
+  };
 }

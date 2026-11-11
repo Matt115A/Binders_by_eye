@@ -1,7 +1,7 @@
 import { useState } from 'react';
+import { shortModel as short } from '../lib/analysis';
 import type { Item, ModelInfo } from '../lib/types';
 
-const short = (l: string) => l.replace(' (sees what you see)', '').replace(/ \((ipTM|interface pLDDT|interface fit|sequence given backbone|sequence only)\)/, '');
 const pct = (v: number | null) => (v == null ? '–' : `${Math.round(v * 100)}%`);
 const RIVAL_KEY = 'bind.rival';
 

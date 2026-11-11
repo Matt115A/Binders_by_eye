@@ -356,3 +356,6 @@ p.save-note { max-width: 680px; margin: 14px 0 0; padding: 10px 14px; border: 1p
 .attempts .card-sub { max-width: 760px; }
 .view-controls .check.is-off { opacity: 0.4; cursor: not-allowed; }
 .view-controls .check.is-off input { cursor: not-allowed; }
+
+/* results: whether the analysis covers this run or every session on the device */
+.scope-tabs { margin: 0 0 14px; }

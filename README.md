@@ -21,9 +21,9 @@ Scored on identical items:
 
 | Model | What it sees |
 |---|---|
-| **Boltz-2** (ipTM) | only the two sequences; has to predict the complex |
-| **ProteinMPNN** (interface fit, and sequence given backbone) | the docked structure you see |
-| **ESM2 650M** | one chain's sequence at a time, no structure, no partner |
+| **Boltz-2 ipTM** | only the two sequences; has to predict the complex |
+| **Boltz-2 ipLDDT** | the same single prediction, scored by its confidence at the interface instead |
+| **ProteinMPNN** (interface fit) | the docked structure you see |
 | **Feature model** | the ten interface numbers shown on screen (leave-one-complex-out) |
 | Fewest clashes / most hydrogen bonds / largest buried area | one interface number each |
 
@@ -39,11 +39,16 @@ interface looks right.
   scores about 68%. That strain is visible on screen, so it is a fair cue, but it is an artefact of the construction
   rather than a fact about binding, and it is the single biggest reason the task is doable at all.
 - **A randomised interface is simply very unlikely protein.** Any model with a feel for what amino acid sequences look
-  like spots it without needing to think about binding at all. ProteinMPNN, asked how likely the interface sequence is
-  given that backbone, scores 99%; its interface-fit variant 94%; and ESM2, which sees one chain's sequence on its own
-  with no structure and no partner, still scores 95%. ESM2 is the one to take seriously as a warning: it cannot
-  possibly be judging the interface, so most of what separates real from fake here is sequence naturalness rather than
-  binding. The interesting comparison is against Boltz-2, the sequence-only folding model, which has to commit to a predicted
+  like spots it without needing to think about binding at all. ESM2 650M, given one chain's sequence on its own with no
+  structure and no partner, scores 95%; ProteinMPNN's raw log p given the backbone scores 99%. Neither can possibly be
+  judging the interface, so **neither is shipped as a benchmark** — a model you are scored against should be answering
+  the question you were asked. Both are still measured, because they are what pins down the size of this artefact:
+  most of what separates real from fake here is sequence naturalness rather than binding.
+  ProteinMPNN's **interface-fit** variant (`mpnn_delta`, 94%) does stay, on evidence rather than taste. Every score
+  correlates with every other across all items, because they all track the label; the test that separates them is the
+  correlation *within* one class. Among fakes, raw log p still follows ESM2 (r = +0.38) while the delta does not
+  (r = −0.05): subtracting the single-chain score cancels the naturalness term and leaves what the partner adds.
+  The interesting comparison is still against Boltz-2, the sequence-only folding model, which has to commit to a predicted
   complex: its ipTM scores 65% (interface pLDDT 75%), against 68% for counting clashing atoms alone.
 - **The real complexes are genuinely unseen.** Every entry was released on or after 2023-06-01, after Boltz-2's
   training cutoff, and entries whose both chains have pre-cutoff homologues

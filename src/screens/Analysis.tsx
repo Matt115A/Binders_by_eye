@@ -1,13 +1,12 @@
 import { useMemo, useRef } from 'react';
 import { Bars, C, Card, Legend, LineChart } from '../components/charts';
 import { ModelProfile } from '../components/ModelProfile';
-import { acc, byCue, byLookTime, cueWeights, modelAccuracy, phaseStats, rolling, streamLearners, subsets } from '../lib/analysis';
+import { acc, byCue, byLookTime, cueWeights, modelAccuracy, phaseStats, rolling, shortModel as short, streamLearners, subsets } from '../lib/analysis';
 import type { Dataset, Item, Session } from '../lib/types';
 
 const pct = (v: number | null | undefined) => (v == null ? '–' : `${Math.round(v * 100)}%`);
 const KIND_COLOR: Record<string, string> = { simple: '#9cc3e6', structure: '#199e70', plm: '#c98500', folding: '#e87ba4' };
 const KIND_LABEL: Record<string, string> = { simple: 'simple rule', structure: 'scores this structure', plm: 'sequence only', folding: 'folds it from sequence' };
-const short = (l: string) => l.replace(' (sees what you see)', '').replace(/ \((ipTM|interface pLDDT|interface fit|sequence given backbone|sequence only)\)/, '');
 const W = 20;
 
 export function Analysis({ session, data, byId, priorIds }: { session: Session; data: Dataset; byId: Map<number, Item>; priorIds: number[] }) {
@@ -65,9 +64,11 @@ export function Analysis({ session, data, byId, priorIds }: { session: Session; 
           looks right. You are in the second group.
         </p>
         <p className="note">
-          Do not read the language models' scores as skill at predicting binding. A fake's interface is uniformly random
-          residues, which leaves a sequence no real protein family would produce — ESM2 sees one chain at a time, with no
-          structure and no partner, and still gets most of them right. It is detecting unnatural protein, not a bad fit.
+          One model is missing on purpose. A fake's interface is uniformly random residues, which leaves a sequence no
+          real protein family would produce, and a language model given one chain at a time — no structure, no partner,
+          no idea where the interface is — still calls 95% of them right. It cannot be judging the interface, so it is
+          not scored against you here: it detects unnatural protein, not a bad fit. That is a limit of how the fakes are
+          made, and it is why the comparison worth making is against Boltz-2.
         </p>
       </Card>
 

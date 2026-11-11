@@ -1,5 +1,5 @@
 import { useMemo, useRef } from 'react';
-import { modelProfile, type ModelResemblance } from '../lib/analysis';
+import { modelProfile, type ModelResemblance, shortModel as short } from '../lib/analysis';
 import type { Dataset, Item, Session } from '../lib/types';
 import { Bars, C, Card, Legend, useWidth } from './charts';
 
@@ -7,7 +7,6 @@ const KIND_COLOR: Record<string, string> = { simple: '#9cc3e6', structure: '#199
 const KIND_LABEL: Record<string, string> = { simple: 'Simple rules', structure: 'Scores this structure', plm: 'Sequence only', folding: 'Folds it from sequence' };
 const KIND_PHRASE: Record<string, string> = { simple: 'simple rules', structure: 'models that score the structure you saw', plm: 'sequence-only models', folding: 'models that fold the complex from sequence' };
 const FONT = "Inter, -apple-system, 'SF Pro Display', 'Helvetica Neue', Arial, sans-serif";
-const short = (l: string) => l.replace(' (sees what you see)', '').replace(/ \((ipTM|interface pLDDT|interface fit|sequence given backbone|sequence only)\)/, '');
 const pct = (v: number | null | undefined) => (v == null ? '–' : `${Math.round(v * 100)}%`);
 
 export function ModelProfile({ session, data, byId }: { session: Session; data: Dataset; byId: Map<number, Item> }) {
@@ -55,7 +54,8 @@ export function ModelProfile({ session, data, byId }: { session: Session; data: 
   );
 }
 
-const COMPACT: Record<string, string> = { 'AlphaFold2-multimer': 'AF2', 'Feature model': 'Features', 'ProteinMPNN': 'MPNN', 'ESM2 650M': 'ESM2', 'Fewest clashing atoms': 'Clashes', 'Most hydrogen bonds': 'H-bonds', 'Largest buried area': 'Buried area' };
+// phone-width spoke labels; keyed by shortModel() output, and the metric is kept so the two Boltz-2 readouts stay apart
+const COMPACT: Record<string, string> = { 'Boltz-2 ipTM': 'B2 ipTM', 'Boltz-2 ipLDDT': 'B2 ipLDDT', 'AlphaFold2-multimer ipTM': 'AF2 ipTM', 'Feature model': 'Features', 'ProteinMPNN': 'MPNN', 'Fewest clashing atoms': 'Clashes', 'Most hydrogen bonds': 'H-bonds', 'Largest buried area': 'Buried area' };
 const FAMILY_ORDER = ['simple', 'plm', 'structure', 'folding'];
 
 /** You at the centre; each model on its own spoke, closer in = answers more like you (higher κ). Spokes grouped by family. */

@@ -17,6 +17,6 @@ export const HELP = {
   gap: { title: 'Looseness of the fit', text: 'Buried area divided by the number of atom contacts. A high number means the chains hide a lot of surface without many atoms actually touching, so the two faces meet across a gap.' },
   board: { title: 'Live scoreboard', text: 'Your accuracy so far next to an AI model scored on exactly the same complexes. Choose which model to race.' },
   answer: { title: 'Your call', text: 'Real binders, or a faked interface? Answer with the keys or by tapping. Trials are balanced, half real and half fake, so guessing gets you 50%.' },
-  models: { title: 'What the models said', text: 'Boltz-2 was given only the two sequences and asked to predict the complex; the score is its own confidence that the chains fit together (ipTM). ProteinMPNN was given the same structure you saw and asked how well the sequence suits that interface. ESM2 saw only the sequence of each chain on its own.' },
+  models: { title: 'What the models said', text: 'Boltz-2 was given only the two sequences and asked to predict the complex; the score is its own confidence that the chains fit together (ipTM). ProteinMPNN was given the same structure you saw and asked how much better the interface sequence fits once the partner chain is there.' },
 } as const;
 export type HelpKey = keyof typeof HELP;
