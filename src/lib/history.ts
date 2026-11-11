@@ -115,9 +115,19 @@ export function cumulativeSession(s: Session): { session: Session; sessions: num
     .filter((x, i, a) => a.findIndex((y) => y.meta.session_id === x.meta.session_id) === i)   // the live copy of s wins
     .sort((a, b) => a.meta.start_time.localeCompare(b.meta.start_time));
   if (all.length < 2) return { session: s, sessions: 1 };
+  // Each session numbers its trials from 1 and times them from its own start; renumber and offset so the
+  // merged sessions lie one after another in play order instead of all piling up at the start of the x axis.
+  let elapsed = 0;
+  const trials = all.flatMap((x) => {
+    const base = elapsed;
+    elapsed += Math.max(x.meta.active_duration_ms ?? 0, ...x.trials.map((t) => t.elapsed_ms ?? 0));
+    return x.trials.map((t) => ({ ...t, elapsed_ms: (t.elapsed_ms ?? 0) + base }));
+  }).map((t, i) => ({ ...t, trial: i + 1 }));
+  const phase_starts: Record<string, number> = {};
+  for (const t of trials) if (!(t.phase in phase_starts)) phase_starts[t.phase] = t.trial;
   const active = all.reduce((t, x) => t + (x.meta.active_duration_ms ?? 0), 0);
   return {
-    session: { ...s, meta: { ...s.meta, start_time: all[0].meta.start_time, active_duration_ms: active }, trials: all.flatMap((x) => x.trials) },
+    session: { ...s, meta: { ...s.meta, start_time: all[0].meta.start_time, active_duration_ms: active, phase_starts }, trials },
     sessions: all.length,
   };
 }
