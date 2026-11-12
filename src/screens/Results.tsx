@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { downloadCsv, downloadMetadata, downloadSessionJson } from '../lib/export';
-import { type HistoryEntry, priorTo, backfillPastSessions, sessionContribution, cumulativeSession } from '../lib/history';
+import { answerScorer, type HistoryEntry, priorTo, backfillPastSessions, sessionContribution, cumulativeSession } from '../lib/history';
 import type { Dataset, Session } from '../lib/types';
 import { Analysis } from './Analysis';
 import { ContributeCard } from '../components/ContributeCard';
@@ -20,6 +20,7 @@ export function Results({ session, data, history, onNew }: { session: Session; d
   const all = scope === 'all' && cum.sessions > 1;
   const shown = all ? cum.session : session;
   const contribution = useMemo(() => sessionContribution(session), [session]);
+  const score = useMemo(() => answerScorer(data), [data]);
   return (
     <div className="results">
       <div className="results-head">
@@ -32,7 +33,7 @@ export function Results({ session, data, history, onNew }: { session: Session; d
           <button className="btn btn-sm btn-primary" onClick={onNew}>Back to start</button>
         </div>
       </div>
-      <ContributeCard sessionId={m.session_id} simulated={!!m.simulated} contribution={contribution} startedAt={Date.parse(m.start_time)} />
+      <ContributeCard sessionId={m.session_id} simulated={!!m.simulated} contribution={contribution} startedAt={Date.parse(m.start_time)} score={score} />
       {cum.sessions > 1 && tab === 'analysis' && (
         <div className="tabs scope-tabs">
           <button className={`tab ${all ? 'active' : ''}`} onClick={() => setScope('all')}>All {cum.sessions} sessions · {cum.session.trials.length}</button>

@@ -222,3 +222,85 @@ export async function flushSuperseded(): Promise<void> {
     if (current) await retire(u.token);
   }
 }
+
+/* ── where you stand: your datapoint against everyone else's, shown only once you have contributed ── */
+/** One other player's datapoint, from the public view (no tokens or hashes). */
+export interface Peer { n: number; items: number[]; responses: string }
+
+/** Every contribution to one game + dataset version. */
+export async function fetchPeers(game: string, dataset: string): Promise<Peer[]> {
+  if (!BIOAI_READY) return [];
+  const out: Peer[] = [];
+  for (let from = 0; from < 50000; from += 1000) {
+    const q = `game=eq.${encodeURIComponent(game)}&dataset_version=eq.${encodeURIComponent(dataset)}&select=n,items,responses&order=id`;
+    const r = await fetch(`${BIOAI_SUPABASE_URL}/rest/v1/public_submissions?${q}`, { headers: { ...headers, Range: `${from}-${from + 999}` } });
+    if (!r.ok) throw new Error(`could not load other players (HTTP ${r.status})`);
+    const page = (await r.json()) as Peer[];
+    out.push(...page);
+    if (page.length < 1000) break;
+  }
+  return out;
+}
+
+/** a is the start of b: the same person, before they added more sessions (or a withdrawal that has not gone through) */
+const isPrefix = (a: Peer, b: Peer) => a.n <= b.n && b.responses.startsWith(a.responses) && a.items.every((x, i) => b.items[i] === x);
+
+/** One datapoint per other person: drop rows that are you (`me`, or an earlier copy of you), and keep only the longest
+ *  of each prefix chain. Two people who merely answered identically stay two people. */
+export function otherPeople(peers: Peer[], me: Peer | null): Peer[] {
+  const others = me ? peers.filter((p) => !isPrefix(p, me) && !isPrefix(me, p)) : peers;
+  return others.filter((p, i) => !others.some((q, j) => j !== i && isPrefix(p, q) && (p.n < q.n || j < i)));
+}
+
+/** What this browser has played of one game + dataset version, as one datapoint (read-only; may be below MIN_ANSWERS). */
+export function myDatapoint(game: string, dataset: string): Peer | null {
+  const cs = Object.values(loadLogged()).filter((e) => e.c.game === game && e.c.dataset_version === dataset).sort((a, b) => a.at - b.at).map((e) => e.c);
+  return cs.length ? { n: cs.reduce((a, c) => a + c.n, 0), items: cs.flatMap((c) => c.items), responses: cs.map((c) => c.responses).join('') } : null;
+}
+
+export interface Standing {
+  me: { score: number; n: number };
+  others: { score: number; n: number }[];
+  /** share of other players you are above (ties count half), 0–100; null when nobody else has contributed */
+  scorePct: number | null;
+  nPct: number | null;
+}
+
+type Scorer = (item: number, response: string) => number | null;
+/** the marks a datapoint earned, in answer order, skipping items this dataset does not know */
+const marks = (p: Peer, score: Scorer) => p.items.map((it, i) => score(it, p.responses[i])).filter((v): v is number => v != null);
+const meanOf = (xs: number[]) => (xs.length ? xs.reduce((a, x) => a + x, 0) / xs.length : null);
+
+/** Score every datapoint with the game's own marking (null = an item this dataset does not know), drop your own row
+ *  and any earlier copies of other people's, then place you on both axes. */
+export function standing(peers: Peer[], mine: Contribution, score: Scorer): Standing {
+  const meP: Peer = { n: mine.n, items: mine.items, responses: mine.responses };
+  const me = { score: meanOf(marks(meP, score)) ?? 0, n: mine.n };
+  const pts = otherPeople(peers, meP).map((p) => ({ score: meanOf(marks(p, score)), n: p.n })).filter((p): p is { score: number; n: number } => p.score != null);
+  const pct = (v: number, xs: number[]) => (xs.length ? (100 * (xs.filter((x) => x < v).length + 0.5 * xs.filter((x) => x === v).length)) / xs.length : null);
+  return { me, others: pts, scorePct: pct(me.score, pts.map((p) => p.score)), nPct: pct(me.n, pts.map((p) => p.n)) };
+}
+
+/** fewer contributors than this and there is no "average human" yet */
+export const MIN_HUMANS = 3;
+
+/** The average human at the same stage of the game, for the live leaderboard: after k answers, each other person's
+ *  mean mark over their first k answers (or all of theirs, if they stopped sooner), averaged over people. `recent`
+ *  is the same over their last `window` of those answers. Null until MIN_HUMANS people have contributed. */
+export function humanBaseline(peers: Peer[], me: Peer | null, score: Scorer) {
+  const sums = otherPeople(peers, me).map((p) => marks(p, score)).filter((m) => m.length)
+    .map((m) => m.reduce<number[]>((acc, v) => (acc.push(acc[acc.length - 1] + v), acc), [0]));
+  if (sums.length < MIN_HUMANS) return null;
+  return {
+    people: sums.length,
+    at(k: number, window: number) {
+      if (k < 1) return { all: null, recent: null };
+      const avg = (f: (S: number[], m: number) => number) => sums.reduce((a, S) => a + f(S, Math.min(k, S.length - 1)), 0) / sums.length;
+      return {
+        all: avg((S, m) => S[m] / m),
+        recent: avg((S, m) => { const r0 = Math.max(0, m - window); return (S[m] - S[r0]) / (m - r0); }),
+      };
+    },
+  };
+}
+export type HumanBaseline = NonNullable<ReturnType<typeof humanBaseline>>;

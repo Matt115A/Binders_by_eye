@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import type { HumanBaseline } from '../lib/bioai';
 import { shortModel as short } from '../lib/analysis';
 import type { Item, ModelInfo } from '../lib/types';
 
@@ -6,15 +7,19 @@ const pct = (v: number | null) => (v == null ? '–' : `${Math.round(v * 100)}%`
 const RIVAL_KEY = 'bind.rival';
 
 export function loadRival(models: ModelInfo[]): string {
-  try { const r = localStorage.getItem(RIVAL_KEY); if (r && models.some((m) => m.name === r)) return r; } catch { /* storage blocked */ }
-  return models.some((m) => m.name === 'boltz2') ? 'boltz2' : models[models.length - 1].name;
+  try { const r = localStorage.getItem(RIVAL_KEY); if (r && (r === HUMAN || models.some((m) => m.name === r))) return r; } catch { /* storage blocked */ }
+  return defaultRival(models);
 }
+function defaultRival(models: ModelInfo[]) { return models.some((m) => m.name === 'boltz2') ? 'boltz2' : models[models.length - 1].name; }
 function saveRival(name: string) { try { localStorage.setItem(RIVAL_KEY, name); } catch { /* storage blocked */ } }
+
+/** the average human, raced like a model */
+export const HUMAN = 'human';
 
 interface Row { name: string; label: string; all: number | null; recent: number | null; you?: boolean }
 
 /** Accuracy of you and every model on exactly the mutations answered so far (overall and over the last `window`). */
-export function boardRows(seen: Item[], correct: boolean[], models: ModelInfo[], window: number): Row[] {
+export function boardRows(seen: Item[], correct: boolean[], models: ModelInfo[], window: number, human?: HumanBaseline | null): Row[] {
   const n = seen.length, r0 = Math.max(0, n - window);
   const mean = (xs: boolean[]) => (xs.length ? xs.filter(Boolean).length / xs.length : null);
   const rows: Row[] = [{ name: 'you', label: 'You', all: mean(correct), recent: mean(correct.slice(r0)), you: true }];
@@ -22,15 +27,18 @@ export function boardRows(seen: Item[], correct: boolean[], models: ModelInfo[],
     const hits = seen.map((v) => v.calls[m.name] === v.label);
     rows.push({ name: m.name, label: short(m.label), all: mean(hits), recent: mean(hits.slice(r0)) });
   }
+  if (human) { const h = human.at(n, window); rows.push({ name: HUMAN, label: 'Average human', all: h.all, recent: h.recent }); }
   return rows;
 }
 
 /** Live scoreboard: you vs a rival model of your choice, overall and last N, plus your rank among all models. */
-export function LiveBoard({ seen, correct, models, window = 10 }: { seen: Item[]; correct: boolean[]; models: ModelInfo[]; window?: number }) {
+export function LiveBoard({ seen, correct, models, window = 10, human }: { seen: Item[]; correct: boolean[]; models: ModelInfo[]; window?: number; human?: HumanBaseline | null }) {
   const [rival, setRival] = useState(() => loadRival(models));
   const [open, setOpen] = useState(false);
-  const rows = boardRows(seen, correct, models, window);
-  const you = rows[0], riv = rows.find((r) => r.name === rival) ?? rows[rows.length - 1];
+  const rows = boardRows(seen, correct, models, window, human);
+  // until the average human has loaded (or if too few have contributed), race the last model instead
+  const shown = rows.some((r) => !r.you && r.name === rival) ? rival : defaultRival(models);
+  const you = rows[0], riv = rows.find((r) => r.name === shown)!;
   const ranked = rows.slice().sort((a, b) => (b.all ?? 0) - (a.all ?? 0) || (a.you ? -1 : b.you ? 1 : 0));
   const rank = seen.length ? 1 + rows.filter((r) => !r.you && (r.all ?? 0) > (you.all ?? 0)).length : null;
   const lead = you.all != null && riv.all != null ? Math.round((you.all - riv.all) * 100) : null;
@@ -48,8 +56,9 @@ export function LiveBoard({ seen, correct, models, window = 10 }: { seen: Item[]
           <tr className="lb-you"><td>You</td>{cell(you.all, riv.all)}{cell(you.recent, riv.recent)}</tr>
           <tr className="lb-rival">
             <td>
-              <select value={rival} onChange={(e) => { pick(e.target.value); e.target.blur(); }} title="Choose the model you're racing" tabIndex={-1}>
+              <select value={shown} onChange={(e) => { pick(e.target.value); e.target.blur(); }} title="Choose the model you're racing" tabIndex={-1}>
                 {models.map((m) => <option key={m.name} value={m.name}>{short(m.label)}</option>)}
+                {human && <option value={HUMAN}>Average human</option>}
               </select>
             </td>
             {cell(riv.all, you.all)}{cell(riv.recent, you.recent)}
@@ -63,12 +72,12 @@ export function LiveBoard({ seen, correct, models, window = 10 }: { seen: Item[]
       </button>
       {open && (
         <div className="lb-pop" onClick={(e) => e.stopPropagation()}>
-          <div className="lb-pop-head"><b>Leaderboard</b><span className="muted">on the {seen.length} complexes you've answered · tap a model to race it</span><button className="btn btn-sm" tabIndex={-1} onClick={() => setOpen(false)}>Close</button></div>
+          <div className="lb-pop-head"><b>Leaderboard</b><span className="muted">on the {seen.length} complexes you've answered · tap a model to race it{human ? ` · Average human = ${human.people} other players after the same number of answers` : ''}</span><button className="btn btn-sm" tabIndex={-1} onClick={() => setOpen(false)}>Close</button></div>
           <table className="data">
             <thead><tr><th>#</th><th>Player</th><th className="num">Overall</th><th className="num">Last {window}</th></tr></thead>
             <tbody>{ranked.map((r, i) => (
-              <tr key={r.name} className={`${r.you ? 'lb-you' : ''} ${r.name === rival ? 'lb-rival' : ''}`} onClick={() => !r.you && pick(r.name)} style={{ cursor: r.you ? 'default' : 'pointer' }}>
-                <td className="muted">{i + 1}</td><td>{r.you ? <b>You</b> : r.label}{r.name === rival && <span className="muted"> · rival</span>}</td>
+              <tr key={r.name} className={`${r.you ? 'lb-you' : ''} ${r.name === shown ? 'lb-rival' : ''}`} onClick={() => !r.you && pick(r.name)} style={{ cursor: r.you ? 'default' : 'pointer' }}>
+                <td className="muted">{i + 1}</td><td>{r.you ? <b>You</b> : r.label}{r.name === shown && <span className="muted"> · rival</span>}</td>
                 <td className="num"><b>{pct(r.all)}</b></td><td className="num">{pct(r.recent)}</td>
               </tr>
             ))}</tbody>

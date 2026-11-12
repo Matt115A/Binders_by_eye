@@ -1,8 +1,9 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { loadDataset } from './lib/dataset';
 import { loadLocal, saveLocal } from './lib/export';
-import { addToHistory, type HistoryEntry, loadHistory } from './lib/history';
+import { addToHistory, answerScorer, type HistoryEntry, loadHistory } from './lib/history';
 import { SessionCore } from './lib/session';
+import { useHumanBaseline } from './lib/useHuman';
 import { simulateSession } from './lib/simulate';
 import { DEFAULT_CONFIG, type Config, type Dataset, type PriorExperience, type Session } from './lib/types';
 import { Experiment } from './screens/Experiment';
@@ -38,6 +39,9 @@ export default function App() {
   const [session, setSession] = useState<Session | null>(null);
   const [history, setHistory] = useState<HistoryEntry[]>(initialHistory);
   const debug = !import.meta.env.VITE_PUBLIC && new URLSearchParams(location.search).has('debug');
+  // other players, as the "average human" on the live leaderboard
+  const scorer = useMemo(() => (data ? answerScorer(data) : null), [data]);
+  const human = useHumanBaseline('binders', data?.version ?? '', scorer, screen === 'experiment');
   useEffect(() => { loadDataset().then(setData).catch((e) => setErr(String(e))); }, []);
   if (err) return <div className="screen"><h2>Couldn't load the dataset</h2><p className="muted">{err}</p></div>;
   if (!data) return <div className="screen"><p className="muted pulse">Loading complexes…</p></div>;
@@ -47,7 +51,7 @@ export default function App() {
         onStart={(c) => { const p = priorFrom(history); setConfig(c); setCore(new SessionCore(fit(c, data, p.exclude), data, p)); setScreen('experiment'); }}
         onSimulate={(c) => { const p = priorFrom(history); const s = simulateSession(fit(c, data, p.exclude), data, undefined, p); saveLocal(s); setSession(s); setScreen('results'); }}
         onOpenSession={(s) => { setSession(s); setScreen('results'); }} onHistoryChange={setHistory} />}
-      {screen === 'experiment' && core && <Experiment core={core} models={data.models} onEnd={(s) => { setHistory(addToHistory(s)); setSession(s); setCore(null); setScreen('results'); }} />}
+      {screen === 'experiment' && core && <Experiment core={core} human={human} models={data.models} onEnd={(s) => { setHistory(addToHistory(s)); setSession(s); setCore(null); setScreen('results'); }} />}
       {screen === 'results' && session && <Results session={session} data={data} history={history} onNew={() => setScreen('setup')} />}
     </>
   );

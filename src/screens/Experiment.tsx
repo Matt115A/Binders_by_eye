@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { ComplexViewer, DEFAULT_VIEW, ViewControls, type ViewOpts } from '../components/ComplexViewer';
 import { LiveBoard } from '../components/LiveBoard';
+import type { HumanBaseline } from '../lib/bioai';
 import { Tour } from '../components/Tour';
 import { InterfacePanel, Reveal, TrialHeader } from '../components/TrialPanels';
 import { loadStructure, mutatedResidues } from '../lib/dataset';
@@ -25,7 +26,7 @@ function loadView(): ViewOpts {
   return DEFAULT_VIEW;
 }
 
-export function Experiment({ core, models, onEnd }: { core: SessionCore; models: ModelInfo[]; onEnd: (s: Session) => void }) {
+export function Experiment({ core, models, onEnd, human }: { core: SessionCore; models: ModelInfo[]; onEnd: (s: Session) => void; human?: HumanBaseline | null }) {
   const [state, setState] = useState<State>(core.phase?.intro ? 'intro' : 'trial');
   const [stim, setStim] = useState<{ it: Item; block: number } | null>(() => core.nextStimulus());
   const [last, setLast] = useState<TrialRecord | null>(null);
@@ -149,7 +150,7 @@ export function Experiment({ core, models, onEnd }: { core: SessionCore; models:
         <span><span className="muted">Time</span> <b>{fmtClock(clock)}</b></span>
         {touch ? <button className="btn btn-sm hud-pause" {...noFocus} onClick={togglePause}>Pause</button> : <span className="muted hud-esc">Esc to pause or stop · progress is saved</span>}
         <button className="btn btn-sm hud-tour" data-tour="tour-button" {...noFocus} onClick={openTour} title="A guided tour of everything on this screen">Tour</button>
-        <span data-tour="board" className="hud-board"><LiveBoard seen={seen.current} correct={core.trials.map((t) => t.correct)} models={models} window={core.config.hudWindow} /></span>
+        <span data-tour="board" className="hud-board"><LiveBoard human={human} seen={seen.current} correct={core.trials.map((t) => t.correct)} models={models} window={core.config.hudWindow} /></span>
       </div>
       {it && (
         <>
