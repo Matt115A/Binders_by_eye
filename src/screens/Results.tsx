@@ -30,7 +30,7 @@ export function Results({ session, data, history, onNew }: { session: Session; d
           <button className="btn btn-sm" onClick={() => downloadCsv(session)}>↓ Trials CSV</button>
           <button className="btn btn-sm" onClick={() => downloadMetadata(session)}>↓ Metadata JSON</button>
           <button className="btn btn-sm" onClick={() => downloadSessionJson(session)}>↓ Session JSON</button>
-          <button className="btn btn-sm btn-primary" onClick={onNew}>Back to start</button>
+          <button className="btn btn-sm btn-primary" onClick={onNew}>Back to home</button>
         </div>
       </div>
       <ContributeCard sessionId={m.session_id} simulated={!!m.simulated} contribution={contribution} startedAt={Date.parse(m.start_time)} score={score} />
